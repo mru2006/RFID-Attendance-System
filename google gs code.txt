@@ -1,0 +1,57 @@
+function doPost(e) {
+  try {
+    if (!e || !e.parameter)
+      return ContentService.createTextOutput("No parameters received");
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var rfid = (e.parameter.rfid || "").trim();
+    var name = (e.parameter.name || "").trim();
+
+    // 🗓 Format today's date as string (never auto-date-format)
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+    //  Get header row and normalize all to text
+    var headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    var header = headerRange.getValues()[0].map(String).map(function (h) {
+      return h.trim();
+    });
+
+    //  Find column with today's date (match as string)
+    var dateCol = header.findIndex(function (h) {
+      return h === today;
+    });
+
+    //  If date column not found, append one (as plain text)
+    if (dateCol === -1) {
+      dateCol = header.length;
+      sheet.getRange(1, dateCol + 1).setValue("'" + today); // apostrophe forces text format
+    } else {
+      dateCol = dateCol; // already exists
+    }
+
+    //  Get all rows
+    var data = sheet.getDataRange().getValues();
+    var found = false;
+
+    //  If RFID exists, mark present
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).trim() === rfid) {
+        sheet.getRange(i + 1, dateCol + 1).setValue("Present");
+        found = true;
+        break;
+      }
+    }
+
+    //  If new RFID, add row and mark Present
+    if (!found) {
+      var newRow = [name, rfid];
+      while (newRow.length < dateCol) newRow.push("");
+      newRow.push("Present");
+      sheet.appendRow(newRow);
+    }
+
+    return ContentService.createTextOutput("✅ Marked Present for " + name);
+  } catch (err) {
+    return ContentService.createTextOutput("❌ Error: " + err);
+  }
+}
